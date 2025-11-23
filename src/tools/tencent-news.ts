@@ -1,41 +1,24 @@
 import { z } from 'zod';
-import { defineToolConfig, handleSuccessResult, http } from '../utils';
+import { defineToolConfig, getRssItems } from '../utils';
 
-const tencentNewsRequestSchema = z.object({
-  page_size: z.number().int().optional().default(20),
+const sources = {
+  vnexpress: 'https://vnexpress.net/rss/the-thao.rss',
+  tuoitre: 'https://tuoitre.vn/rss/the-thao.rss',
+  dantri: 'https://dantri.com.vn/the-thao.rss',
+};
+
+const schema = z.object({
+  source: z.union([z.literal('vnexpress'), z.literal('tuoitre'), z.literal('dantri')]).optional().default('vnexpress'),
+  limit: z.number().int().min(1).max(200).optional().default(30),
 });
 
 export default defineToolConfig({
-  name: 'get-tencent-news-trending',
-  description: '获取腾讯新闻热点榜，包含国内外时事、社会热点、财经资讯、娱乐动态及体育赛事的综合性中文新闻资讯',
-  zodSchema: tencentNewsRequestSchema,
+  name: 'get-vn-sports',
+  description: 'Lấy tin thể thao từ VnExpress, TuoiTre, DanTri (RSS ưu tiên khi có).',
+  zodSchema: schema,
   func: async (args) => {
-    const { page_size } = tencentNewsRequestSchema.parse(args);
-    const resp = await http.get<{
-      ret: number;
-      idlist: [{ newslist: any[] }];
-    }>('https://r.inews.qq.com/gw/event/hot_ranking_list', {
-      params: {
-        page_size,
-      },
-    });
-
-    if (resp.data.ret !== 0 || !Array.isArray(resp.data.idlist?.[0].newslist)) {
-      throw new Error('获取腾讯新闻热点榜失败');
-    }
-
-    return resp.data.idlist[0].newslist
-      .filter((_, index) => index !== 0)
-      .map((item) => {
-        return {
-          title: item.title,
-          description: item.abstract,
-          cover: item.thumbnails?.[0],
-          source: item.source,
-          popularity: item.hotEvent.hotScore,
-          publish_time: item.time,
-          link: item.url,
-        };
-      });
+    const { source, limit } = schema.parse(args);
+    const url = sources[source];
+    return getRssItems(url, { limit });
   },
 });
