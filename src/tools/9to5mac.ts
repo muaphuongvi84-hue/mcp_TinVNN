@@ -1,7 +1,24 @@
+import { z } from 'zod';
 import { defineToolConfig, getRssItems } from '../utils';
 
+const sources = {
+  cafef: 'https://cafef.vn/rss/gia-ca-phe.rss', // nếu site có feed chuyên mục
+  vietnamnet: 'https://vietnamnet.vn/rss/kinh-doanh.rss',
+  dantri: 'https://dantri.com.vn/kinh-doanh.rss',
+};
+
+const schema = z.object({
+  source: z.union([z.literal('cafef'), z.literal('vietnamnet'), z.literal('dantri')]).optional().default('cafef'),
+  limit: z.number().int().min(1).max(200).optional().default(20),
+});
+
 export default defineToolConfig({
-  name: 'get-9to5mac-news',
-  description: '获取 9to5Mac 苹果相关新闻，包含苹果产品发布、iOS 更新、Mac 硬件、应用推荐及苹果公司动态的英文资讯',
-  func: () => getRssItems('https://9to5mac.com/feed/'),
+  name: 'get-vn-coffee',
+  description: 'Lấy tin liên quan tới giá cà phê / nông sản từ các báo lớn Việt Nam (CafeF, VietnamNet, DanTri).',
+  zodSchema: schema,
+  func: async (args) => {
+    const { source, limit } = schema.parse(args);
+    const url = sources[source];
+    return getRssItems(url, { limit });
+  },
 });
