@@ -1,80 +1,24 @@
-import { z as z5 } from "zod";
-import type { ToolConfig as TC5 } from "../types";
-import { fetchHtml as fh5, loadHtml as lh5, safeText as st5, resolveUrl as ru5 } from "../utils/fetcher";
+import { z } from 'zod';
+import { defineToolConfig, getRssItems } from '../utils';
 
+const sources = {
+  cafef: 'https://cafef.vn/rss/kinh-doanh.rss',
+  vneconomy: 'https://vneconomy.vn/rss/home.rss',
+  vnexpress: 'https://vnexpress.net/rss/kinh-doanh.rss',
+};
 
-const Item5 = z5.object({
-title: z5.string(),
-url: z5.string(),
-source: z5.string(),
-category: z5.string().optional(),
-summary: z5.string().nullable().optional(),
-cover: z5.string().nullable().optional(),
-publishedAt: z5.string().nullable().optional(),
-content: z5.string().nullable().optional(),
+const schema = z.object({
+  source: z.union([z.literal('cafef'), z.literal('vneconomy'), z.literal('vnexpress')]).optional().default('cafef'),
+  limit: z.number().int().min(1).max(200).optional().default(40),
 });
 
-
-export default {
-name: "trends-vn-economy",
-description: "Lấy tin kinh tế (Cafef, VnEconomy, VnExpress Kinh Doanh)",
-inputSchema: z5.object({}),
-outputSchema: z5.object({ items: z5.array(Item5) }),
-execute: async () => {
-const results: any[] = [];
-
-
-try {
-const base = "https://cafef.vn";
-const html = await fh5(base);
-const $ = lh5(html);
-$(".boxArticleList .article, .listnews li, .listnews .news-item").each((i, el) => {
-try {
-const $el = $(el);
-const a = $el.find("a").first();
-const href = a.attr("href") || "";
-const url = ru5(base, href);
-const title = st5(a.text ? a.text() : a);
-if (title && url) results.push({ title, url, source: "cafef", category: "economy", summary: null, cover: null, publishedAt: null, content: null });
-} catch (e) {}
+export default defineToolConfig({
+  name: 'get-vn-economy',
+  description: 'Lấy tin kinh tế/kinh doanh từ CafeF, VnEconomy, VnExpress.',
+  zodSchema: schema,
+  func: async (args) => {
+    const { source, limit } = schema.parse(args);
+    const url = sources[source];
+    return getRssItems(url, { limit });
+  },
 });
-} catch (e) {}
-
-
-try {
-const base = "https://vneconomy.vn";
-const html = await fh5(base);
-const $ = lh5(html);
-$(".list-article .article, .module-list li").each((i, el) => {
-try {
-const $el = $(el);
-const a = $el.find("a").first();
-const href = a.attr("href") || "";
-const url = ru5(base, href);
-const title = st5(a.text ? a.text() : a);
-if (title && url) results.push({ title, url, source: "vneconomy", category: "economy", summary: null, cover: null, publishedAt: null, content: null });
-} catch (e) {}
-});
-} catch (e) {}
-
-
-try {
-const base = "https://vnexpress.net";
-const html = await fh5(`${base}/kinh-doanh`);
-const $ = lh5(html);
-$(".list-news .item-news, article.item-news").each((i, el) => {
-try {
-const $el = $(el);
-const a = $el.find("a[href]").first();
-const url = ru5(base, a.attr("href") || "");
-const title = st5(a.text ? a.text() : a);
-if (title && url) results.push({ title, url, source: "vnexpress", category: "economy", summary: null, cover: null, publishedAt: null, content: null });
-} catch (e) {}
-});
-} catch (e) {}
-
-
-const unique = Array.from(new Map(results.map((r) => [r.url, r])).values()).slice(0, 60);
-return { items: unique };
-},
-} satisfies TC5;
